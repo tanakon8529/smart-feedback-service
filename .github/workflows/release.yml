@@ -12,7 +12,8 @@ jobs:
       ${{ github.event.workflow_run.conclusion == 'success' &&
           github.event.workflow_run.head_branch == 'main' }}
     steps:
-      - uses: google-github-actions/release-please-action@v4
+      - uses: googleapis/release-please-action@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          config-file: .release-please-config.json
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
