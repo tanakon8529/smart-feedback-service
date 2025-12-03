@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smart-feedback-service
+  labels:
+    app: smart-feedback-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: smart-feedback-service
+  template:
+    metadata:
+      labels:
+        app: smart-feedback-service
+    spec:
+      containers:
+        - name: web
+          image: nginx:stable
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: GEMINI_API_KEY
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
