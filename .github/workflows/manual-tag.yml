@@ -1,0 +1,23 @@
+name: Manual Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      level:
+        description: bump level (major, minor, patch)
+        required: true
+        default: patch
+      preid:
+        description: prerelease id (optional)
+        required: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: mathieudutour/github-tag-action@v6.1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          default_bump: ${{ github.event.inputs.level }}
+          preid: ${{ github.event.inputs.preid }}
