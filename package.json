@@ -1,0 +1,11 @@
+{
+  "name": "smart-feedback-service",
+  "private": true,
+  "version": "0.0.0",
+  "devDependencies": {
+    "husky": "^9.0.0"
+  },
+  "scripts": {
+    "prepare": "husky install"
+  }
+}

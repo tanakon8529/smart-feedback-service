@@ -1,0 +1,36 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "Running pre-push checks..."
+
+if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+  docker compose -f docker-compose.yml up -d --build >/dev/null 2>&1 || true
+  tries=0; timeout=60
+  while true; do
+    code=$(curl -sS -o /dev/null -w "%{http_code}" http://localhost:8000/health || echo "000")
+    [ "$code" = "200" ] && break
+    tries=$((tries+1)); [ $tries -ge $timeout ] && { docker compose -f docker-compose.yml down >/dev/null 2>&1 || true; exit 1; }
+    sleep 1
+  done
+  docker compose -f docker-compose.yml exec -T web python -m pytest -q tests/unit tests/integration || { docker compose -f docker-compose.yml down >/dev/null 2>&1 || true; exit 1; }
+  docker compose -f docker-compose.yml down >/dev/null 2>&1 || true
+  echo "Pre-push checks passed"
+  exit 0
+fi
+
+if python - <<PY
+import sys
+try:
+    import pytest  # noqa
+    sys.exit(0)
+except Exception:
+    sys.exit(1)
+PY
+then
+  python -m pytest -q tests/unit tests/integration || exit 1
+  echo "Pre-push checks passed"
+  exit 0
+fi
+
+echo "No docker compose or local pytest available"
+exit 1
