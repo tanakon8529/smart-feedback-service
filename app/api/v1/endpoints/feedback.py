@@ -4,6 +4,8 @@ from sqlalchemy import func, select
 from app.core.database import get_session
 from app.models.feedback import Feedback, FeedbackCreate, FeedbackRead, Category, Sentiment
 from app.services.ai_service import AIService
+from app.core.cache import cache_get, cache_set
+from app.core.queue import publish_feedback_event
 
 router = APIRouter()
 ai_service = AIService()
@@ -32,6 +34,12 @@ async def create_feedback(
     session.add(feedback)
     await session.commit()
     await session.refresh(feedback)
+    await publish_feedback_event({
+        "id": feedback.id,
+        "customer_id": feedback.customer_id,
+        "sentiment": feedback.sentiment.value if feedback.sentiment else None,
+        "category": feedback.category.value if feedback.category else None,
+    })
     
     return feedback
 
@@ -41,7 +49,12 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)):
     Get aggregated statistics for feedback.
     Optimized for performance using database-level aggregation.
     """
-    
+    # Try cache first
+    cached = await cache_get("dashboard_stats")
+    if cached:
+        import json
+        return json.loads(cached)
+
     # Optimized Queries: Group by Category
     cat_query = select(Feedback.category, func.count(Feedback.id)).group_by(Feedback.category)
     cat_result = await session.exec(cat_query)
@@ -63,8 +76,11 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)):
     total_result = await session.exec(total_query)
     total_count = total_result.scalar_one()
     
-    return {
+    result = {
         "total_feedback": total_count,
         "by_category": category_stats,
         "by_sentiment": sentiment_stats
     }
+    import json
+    await cache_set("dashboard_stats", json.dumps(result), ttl=60)
+    return result

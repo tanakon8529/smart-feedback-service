@@ -11,3 +11,5 @@ pytest
 pytest-asyncio
 greenlet
 google-generativeai
+redis
+aio-pika
