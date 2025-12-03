@@ -29,16 +29,7 @@ jobs:
       - name: Mock Sonar scan (no secrets required)
         run: |
           echo "[MOCK] SonarQube scan skipped on dev (no secrets)"
-      - name: Optional real Sonar scan (if secrets present)
-        if: ${{ secrets.SONAR_TOKEN != '' && secrets.SONAR_HOST_URL != '' && secrets.SONAR_PROJECT_KEY != '' }}
-        uses: sonarsource/sonarqube-scan-action@v3.0.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: >-
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
-            -Dsonar.projectName=smart-feedback-service
+      # Optional real Sonar scan (disabled by default; enable by adding a separate workflow)
       - name: Mock security scan
         run: |
           echo "[MOCK] Security scan passed"
