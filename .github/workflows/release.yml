@@ -7,13 +7,59 @@ on:
 
 jobs:
   release:
+    name: Create Release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     if: >-
       ${{ github.event.workflow_run.conclusion == 'success' &&
           github.event.workflow_run.head_branch == 'main' }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: actions/checkout@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "lts/*"
+
+      - name: Install dependencies
+        run: |
+          npm install -g semantic-release @semantic-release/git @semantic-release/changelog @semantic-release/exec @semantic-release/github @semantic-release/commit-analyzer @semantic-release/release-notes-generator
+
+      - name: Setup release config
+        run: |
+          cat > release.config.js << 'EOF'
+          module.exports = {
+            branches: ['main'],
+            plugins: [
+              '@semantic-release/commit-analyzer',
+              '@semantic-release/release-notes-generator',
+              '@semantic-release/changelog',
+              ['@semantic-release/git', {
+                assets: ['CHANGELOG.md'],
+                message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}'
+              }],
+              ['@semantic-release/github', { assets: [] }],
+              ['@semantic-release/exec', { prepareCmd: 'echo ${nextRelease.version} > VERSION' }]
+            ],
+            tagFormat: 'v${version}'
+          };
+          EOF
+
+      - name: Create Release
+        id: semantic
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+      - name: Update version references and tag
+        if: steps.semantic.outputs.new_release_published == 'true'
+        run: |
+          VERSION=$(cat VERSION)
+          echo "Updated to version $VERSION"
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git rev-parse -q --verify "refs/tags/v$VERSION" || { git tag -a "v$VERSION" -m "Release version $VERSION" && git push origin "v$VERSION"; }
