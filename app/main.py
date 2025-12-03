@@ -1,12 +1,15 @@
 from fastapi import FastAPI
 from app.api.v1.api import api_router
-from app.core.database import init_db
+from app.core.database import init_db, DBRoutingMiddleware
 
 app = FastAPI(
     title="Smart Feedback Analysis Service",
     description="AI-Driven Microservice for Feedback Analysis",
     version="1.0.0"
 )
+
+# Register DB Routing Middleware
+app.add_middleware(DBRoutingMiddleware)
 
 @app.on_event("startup")
 async def on_startup():

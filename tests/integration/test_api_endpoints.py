@@ -10,9 +10,10 @@ async def test_create_feedback(client):
     response = await client.post("/api/v1/feedback", json=payload)
     assert response.status_code == 201
     data = response.json()
+    print("NEG_FEEDBACK_DATA:", data)
     assert data["customer_id"] == "cust_001"
-    assert data["sentiment"] == Sentiment.POSITIVE
-    assert data["category"] == Category.PRODUCT
+    assert data["sentiment"] == "Positive"
+    assert data["category"] == "Product"
     assert "summary" in data
 
 @pytest.mark.asyncio
@@ -24,8 +25,8 @@ async def test_create_negative_feedback(client):
     response = await client.post("/api/v1/feedback", json=payload)
     assert response.status_code == 201
     data = response.json()
-    assert data["sentiment"] == Sentiment.NEGATIVE
-    assert data["category"] == Category.DELIVERY
+    assert data["sentiment"] == "Negative"
+    assert data["category"] == "Delivery"
 
 @pytest.mark.asyncio
 async def test_dashboard_stats(client):
@@ -33,6 +34,7 @@ async def test_dashboard_stats(client):
     response = await client.get("/api/v1/dashboard/stats")
     assert response.status_code == 200
     data = response.json()
+    print("DASHBOARD_STATS:", data)
     
     assert data["total_feedback"] >= 2
     assert data["by_sentiment"]["Positive"] >= 1

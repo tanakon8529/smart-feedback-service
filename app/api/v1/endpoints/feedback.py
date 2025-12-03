@@ -44,17 +44,23 @@ async def get_dashboard_stats(session: AsyncSession = Depends(get_session)):
     
     # Optimized Queries: Group by Category
     cat_query = select(Feedback.category, func.count(Feedback.id)).group_by(Feedback.category)
-    cat_result = await session.execute(cat_query)
-    category_stats = {row[0]: row[1] for row in cat_result.all() if row[0] is not None}
+    cat_result = await session.exec(cat_query)
+    category_stats = {
+        (row[0].value if isinstance(row[0], Category) else row[0]): row[1]
+        for row in cat_result.all() if row[0] is not None
+    }
     
     # Optimized Queries: Group by Sentiment
     sent_query = select(Feedback.sentiment, func.count(Feedback.id)).group_by(Feedback.sentiment)
-    sent_result = await session.execute(sent_query)
-    sentiment_stats = {row[0]: row[1] for row in sent_result.all() if row[0] is not None}
+    sent_result = await session.exec(sent_query)
+    sentiment_stats = {
+        (row[0].value if isinstance(row[0], Sentiment) else row[0]): row[1]
+        for row in sent_result.all() if row[0] is not None
+    }
     
     # Total Count
     total_query = select(func.count(Feedback.id))
-    total_result = await session.execute(total_query)
+    total_result = await session.exec(total_query)
     total_count = total_result.scalar_one()
     
     return {

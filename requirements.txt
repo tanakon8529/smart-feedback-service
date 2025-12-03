@@ -1,5 +1,5 @@
 fastapi
-uvicorn[standard]
+granian[reload]
 sqlmodel
 asyncpg
 pydantic
@@ -10,3 +10,4 @@ httpx
 pytest
 pytest-asyncio
 greenlet
+google-generativeai

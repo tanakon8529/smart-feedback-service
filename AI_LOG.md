@@ -1,6 +1,7 @@
 
-### 6. Test Generation
-- **Task**: Unit Tests
+### 7. High-Performance Optimizations
+- **Task**: Switch to `uv` and `Granian`.
 - **AI Contribution**:
-    - Generated `conftest.py` for async database fixture management.
-    - Wrote `tests/test_api.py` covering positive/negative feedback flows and dashboard aggregation logic.
+    -   Replaced `pip` with `uv` in Dockerfile for ultra-fast dependency installation.
+    -   Switched web server from `Uvicorn` to `Granian` (Rust-based) for higher throughput and lower latency.
+    -   Updated `requirements.txt` and `Dockerfile` command accordingly.
