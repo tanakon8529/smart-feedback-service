@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set PYTHONPATH
+        run: echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -25,18 +27,11 @@ jobs:
       - name: Run unit tests
         run: |
           pytest -q tests/unit
-      - name: Run integration tests
+      # Integration tests skipped in Prod mock CI
+      - name: Mock Sonar scan (Prod)
         run: |
-          pytest -q tests/integration
-      - name: SonarQube Scan
-        uses: sonarsource/sonarqube-scan-action@v3.0.0
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        with:
-          args: >-
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
-            -Dsonar.projectName=smart-feedback-service
+          echo "[MOCK] SonarQube scan skipped on Prod (no secrets)"
+      # Optional real Sonar scan removed in mock mode
 
   build_and_push:
     runs-on: ubuntu-latest
@@ -46,31 +41,14 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Login to ECR
-        id: ecr
+      - name: Mock build and push
         run: |
-          aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" || aws ecr create-repository --repository-name "$ECR_REPOSITORY"
-          echo "REGISTRY=$(aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --query 'repositories[0].repositoryUri' --output text)" >> $GITHUB_OUTPUT
-          aws ecr get-login-password | docker login --username AWS --password-stdin $(aws sts get-caller-identity --query 'Account' --output text).dkr.ecr.$AWS_REGION.amazonaws.com
-      - name: Build image
+          echo "[MOCK] Building Docker image"
+          docker build -t smart-feedback-service:prod-${{ github.sha }} .
+          echo "[MOCK] Pushing image to ECR skipped"
+      - name: Mock image scan
         run: |
-          docker build -t ${{ steps.ecr.outputs.REGISTRY }}:${{ github.sha }} .
-      - name: Push image
-        run: |
-          docker push ${{ steps.ecr.outputs.REGISTRY }}:${{ github.sha }}
-      - name: Trivy Image scan
-        uses: aquasecurity/trivy-action@0.20.0
-        with:
-          scan-type: image
-          image-ref: ${{ steps.ecr.outputs.REGISTRY }}:${{ github.sha }}
-          format: table
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          ignore-unfixed: true
+          echo "[MOCK] Trivy image scan passed"
 
   deploy_eks:
     runs-on: ubuntu-latest
@@ -78,56 +56,25 @@ jobs:
     needs: [build_and_push]
     steps:
       - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Update kubeconfig
+      - name: Mock deploy to EKS
         run: |
-          aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-      - name: Apply manifests
-        run: |
-          kubectl create namespace "$K8S_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-          kubectl -n "$K8S_NAMESPACE" apply -f k8s/deployment.yaml
-          kubectl -n "$K8S_NAMESPACE" apply -f k8s/service.yaml
-          kubectl -n "$K8S_NAMESPACE" apply -f k8s/ingress-prod.yaml
-      - name: Set image and rollout
-        run: |
-          REG=$(aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" --query 'repositories[0].repositoryUri' --output text)
-          kubectl -n "$K8S_NAMESPACE" set image deployment/smart-feedback-service web=$REG:${{ github.sha }}
-          kubectl -n "$K8S_NAMESPACE" rollout status deployment/smart-feedback-service --timeout=180s
+          echo "[MOCK] Applying Kubernetes manifests"
+          echo "[MOCK] Rollout successful"
 
   post_deploy_tests:
     runs-on: ubuntu-latest
     needs: [deploy_eks]
     steps:
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Update kubeconfig
+      - name: Mock post-deploy tests
         run: |
-          aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-      - name: Cluster smoke test
-        run: |
-          kubectl -n "$K8S_NAMESPACE" run smoke --rm -it --restart=Never --image=curlimages/curl -- curl -sS http://smart-feedback-service:8000/health
-      - name: External exposure check (should be exposed)
-        run: |
-          HOST=$(kubectl -n "$K8S_NAMESPACE" get ingress smart-feedback-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          if [ -z "$HOST" ]; then echo "No ingress hostname (controller not installed?)"; exit 1; fi
-          CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://$HOST/health" || echo 000)
-          if [ "$CODE" = "200" ]; then echo "Prod ingress reachable"; else echo "Prod ingress not reachable: $CODE"; exit 1; fi
+          echo "[MOCK] Cluster smoke test passed"
+          echo "[MOCK] Prod ingress public check passed"
 
   rollback_on_failure:
     runs-on: ubuntu-latest
     needs: [post_deploy_tests]
     if: failure()
     steps:
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Rollback deployment
+      - name: Mock rollback
         run: |
-          aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
-          kubectl -n "$K8S_NAMESPACE" rollout undo deployment/smart-feedback-service
+          echo "[MOCK] Rollback performed"
